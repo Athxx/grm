@@ -46,8 +46,7 @@ func wrapPageSQL(dbType string, sqlStr string, page *Page) (string, error) {
 	} else {
 		return "", errors.New("wrapPageSQL()-->不支持的数据库类型:" + dbType)
 	}
-	sqlStr = sqlbuilder.String()
-	return reBindSQL(dbType, sqlStr)
+	return reBindSQL(dbType, sqlbuilder.String())
 }
 
 //wrapInsertSQL  包装保存Struct语句.返回语句,是否自增,错误信息
@@ -185,19 +184,18 @@ func wrapInsertSQLNOreBuild(dbType string, typeOf *reflect.Type, entity IEntityS
 		sqlBuilder.WriteString(",")
 		valueSQLBuilder.WriteString("?,")
 	}
-	//去掉字符串最后的 ','
 	//Remove the',' at the end of the string
-	sqlStr := sqlBuilder.String()
-	if len(sqlStr) > 0 {
-		sqlStr = sqlStr[:len(sqlStr)-1]
+	if sqlBuilder.Len() > 0 {
+		sqlBuilder.RemoveEnd(1)
 	}
-	valStr := valueSQLBuilder.String()
-	if len(valStr) > 0 {
-		valStr = valStr[:len(valStr)-1]
+	if valueSQLBuilder.Len() > 0 {
+		valueSQLBuilder.RemoveEnd(1)
 	}
-	sqlStr = sqlStr + ")" + valStr + ")"
+	sqlBuilder.WriteString(")")
+	sqlBuilder.WriteString(valueSQLBuilder.String())
+	sqlBuilder.WriteString(")")
 	//saveSql, err := wrapSQL(dbType, sqlStr)
-	return sqlStr, autoIncrement, pkType, nil
+	return sqlBuilder.String(), autoIncrement, pkType, nil
 }
 
 //wrapInsertSliceSQL 包装批量保存StructSlice语句.返回语句,是否自增,错误信息
@@ -350,12 +348,12 @@ func wrapUpdateSQL(dbType string, typeOf *reflect.Type, entity IEntityStruct, co
 	*values = append(*values, pkValue)
 	//去掉字符串最后的 ','
 	//Remove the',' at the end of the string
-	sqlStr := sqlBuilder.String()
-	sqlStr = sqlStr[:len(sqlStr)-1]
+	sqlBuilder.RemoveEnd(1)
+	sqlBuilder.WriteString(" WHERE ")
+	sqlBuilder.WriteString(entity.PK())
+	sqlBuilder.WriteString("=?")
 
-	sqlStr = sqlStr + " WHERE " + entity.PK() + "=?"
-
-	return reBindSQL(dbType, sqlStr)
+	return reBindSQL(dbType, sqlBuilder.String())
 }
 
 //wrapDeleteSQL 包装删除Struct语句
@@ -370,8 +368,7 @@ func wrapDeleteSQL(dbType string, entity IEntityStruct) (string, error) {
 	sqlBuilder.WriteString(" WHERE ")
 	sqlBuilder.WriteString(entity.PK())
 	sqlBuilder.WriteString("=?")
-	sqlStr := sqlBuilder.String()
-	return reBindSQL(dbType, sqlStr)
+	return reBindSQL(dbType, sqlBuilder.String())
 }
 
 //wrapInsertEntityMapSQL 包装保存Map语句,Map因为没有字段属性,无法完成Id的类型判断和赋值,需要确保Map的值是完整的
@@ -421,18 +418,16 @@ func wrapInsertEntityMapSQL(dbType string, entity IEntityMap) (string, []interfa
 	}
 	//去掉字符串最后的 ','
 	//Remove the',' at the end of the string
-	sqlStr := sqlBuilder.String()
-	if len(sqlStr) > 0 {
-		sqlStr = sqlStr[:len(sqlStr)-1]
+	if sqlBuilder.Len() > 0 {
+		sqlBuilder.RemoveEnd(1)
 	}
-	valStr := valueSQLBuilder.String()
-	if len(valStr) > 0 {
-		valStr = valStr[:len(valStr)-1]
+	if valueSQLBuilder.Len() > 0 {
+		valueSQLBuilder.RemoveEnd(1)
 	}
-	sqlStr = sqlStr + ")" + valStr + ")"
-
-	var e error
-	sqlStr, e = reBindSQL(dbType, sqlStr)
+	sqlBuilder.WriteString(")")
+	sqlBuilder.WriteString(valueSQLBuilder.String())
+	sqlBuilder.WriteString(")")
+	sqlStr, e := reBindSQL(dbType, sqlBuilder.String())
 	if e != nil {
 		return "", nil, autoIncrement, e
 	}
@@ -476,11 +471,13 @@ func wrapUpdateEntityMapSQL(dbType string, entity IEntityMap) (string, []interfa
 	//Remove the',' at the end of the string
 	sqlStr := sqlBuilder.String()
 	sqlStr = sqlStr[:len(sqlStr)-1]
-
-	sqlStr = sqlStr + " WHERE " + entity.PK() + "=?"
+	sqlBuilder.RemoveEnd(1)
+	sqlBuilder.WriteString(" WHERE ")
+	sqlBuilder.WriteString(entity.PK())
+	sqlBuilder.WriteString("=?")
 
 	var e error
-	sqlStr, e = reBindSQL(dbType, sqlStr)
+	sqlStr, e = reBindSQL(dbType, sqlBuilder.String())
 	if e != nil {
 		return "", nil, e
 	}
