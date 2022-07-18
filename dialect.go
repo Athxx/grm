@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -29,19 +28,19 @@ func wrapPageSQL(drv string, sqlStr string, page *Page) (string, error) {
 	sqlbuilder.WriteString(sqlStr)
 	if drv == "mysql" || drv == "sqlite" || drv == "clickhouse" { //MySQL,sqlite3,dm数据库,南大通用,clickhouse
 		sqlbuilder.WriteString(" LIMIT ")
-		sqlbuilder.WriteString(strconv.Itoa(page.PageSize * (page.PageNo - 1)))
+		sqlbuilder.WriteInt(page.PageSize * (page.PageNo - 1))
 		sqlbuilder.WriteString(",")
-		sqlbuilder.WriteString(strconv.Itoa(page.PageSize))
+		sqlbuilder.WriteInt(page.PageSize)
 	} else if drv == "postgresql" { //postgresql
 		sqlbuilder.WriteString(" LIMIT ")
-		sqlbuilder.WriteString(strconv.Itoa(page.PageSize))
+		sqlbuilder.WriteInt(page.PageSize)
 		sqlbuilder.WriteString(" OFFSET ")
-		sqlbuilder.WriteString(strconv.Itoa(page.PageSize * (page.PageNo - 1)))
+		sqlbuilder.WriteInt(page.PageSize * (page.PageNo - 1))
 	} else if drv == "mssql" || drv == "oracle" { //sqlserver 2012+,oracle 12c+
 		sqlbuilder.WriteString(" OFFSET ")
-		sqlbuilder.WriteString(strconv.Itoa(page.PageSize * (page.PageNo - 1)))
+		sqlbuilder.WriteInt(page.PageSize * (page.PageNo - 1))
 		sqlbuilder.WriteString(" ROWS FETCH NEXT ")
-		sqlbuilder.WriteString(strconv.Itoa(page.PageSize))
+		sqlbuilder.WriteInt(page.PageSize)
 		sqlbuilder.WriteString(" ROWS ONLY ")
 	} else {
 		return "", errors.New("wrapPageSQL()-->不支持的数据库类型:" + drv)
@@ -522,13 +521,13 @@ func reBindSQL(drv string, sqlStr string) (string, error) {
 	for i := 1; i < len(strs); i++ {
 		if drv == "postgresql" { //postgresql
 			sqlBuilder.WriteString("$")
-			sqlBuilder.WriteString(strconv.Itoa(i))
+			sqlBuilder.WriteInt(i)
 		} else if drv == "mssql" { //mssql
 			sqlBuilder.WriteString("@p")
-			sqlBuilder.WriteString(strconv.Itoa(i))
+			sqlBuilder.WriteInt(i)
 		} else if drv == "oracle" { //oracle
 			sqlBuilder.WriteString(":")
-			sqlBuilder.WriteString(strconv.Itoa(i))
+			sqlBuilder.WriteInt(i)
 		} else { //其他情况,还是使用 '?' | In other cases, or use'?'
 			sqlBuilder.WriteString("?")
 		}

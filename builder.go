@@ -1,7 +1,7 @@
 package grm
 
 import (
-	"unicode/utf8"
+	"strconv"
 	"unsafe"
 )
 
@@ -27,11 +27,6 @@ func noescape(p unsafe.Pointer) unsafe.Pointer {
 
 func (b *SQLBuilder) copyCheck() {
 	if b.addr == nil {
-		// This hack works around a failing of Go's escape analysis
-		// that was causing b to escape and be heap allocated.
-		// See issue 23382.
-		// TODO: once issue 7921 is fixed, this should be reverted to
-		// just "b.addr = b".
 		b.addr = (*SQLBuilder)(noescape(unsafe.Pointer(b)))
 	} else if b.addr != b {
 		panic("strings: illegal use of non-zero SQLBuilder copied by value")
@@ -57,67 +52,30 @@ func (b *SQLBuilder) Reset() {
 	b.buf = nil
 }
 
-// grow copies the buffer to a new, larger buffer so that there are at least n
-// bytes of capacity beyond len(b.buf).
-func (b *SQLBuilder) grow(n int) {
-	buf := make([]byte, len(b.buf), 2*cap(b.buf)+n)
-	copy(buf, b.buf)
-	b.buf = buf
-}
-
-// Grow grows b's capacity, if necessary, to guarantee space for
-// another n bytes. After Grow(n), at least n bytes can be written to b
-// without another allocation. If n is negative, Grow panics.
-func (b *SQLBuilder) Grow(n int) {
-	b.copyCheck()
-	if n < 0 {
-		panic("strings.SQLBuilder.Grow: negative count")
-	}
-	if cap(b.buf)-len(b.buf) < n {
-		b.grow(n)
-	}
-}
-
 // Write appends the contents of p to b's buffer.
 // Write always returns len(p), nil.
-func (b *SQLBuilder) Write(p []byte) (int, error) {
+func (b *SQLBuilder) Write(p []byte) {
 	b.copyCheck()
 	b.buf = append(b.buf, p...)
-	return len(p), nil
 }
 
 // WriteByte appends the byte c to b's buffer.
 // The returned error is always nil.
-func (b *SQLBuilder) WriteByte(c byte) error {
+func (b *SQLBuilder) WriteByte(c byte) {
 	b.copyCheck()
 	b.buf = append(b.buf, c)
-	return nil
-}
-
-// WriteRune appends the UTF-8 encoding of Unicode code point r to b's buffer.
-// It returns the length of r and a nil error.
-func (b *SQLBuilder) WriteRune(r rune) (int, error) {
-	b.copyCheck()
-	// Compare as uint32 to correctly handle negative runes.
-	if uint32(r) < utf8.RuneSelf {
-		b.buf = append(b.buf, byte(r))
-		return 1, nil
-	}
-	l := len(b.buf)
-	if cap(b.buf)-l < utf8.UTFMax {
-		b.grow(utf8.UTFMax)
-	}
-	n := utf8.EncodeRune(b.buf[l:l+utf8.UTFMax], r)
-	b.buf = b.buf[:l+n]
-	return n, nil
 }
 
 // WriteString appends the contents of s to b's buffer.
 // It returns the length of s and a nil error.
-func (b *SQLBuilder) WriteString(s string) (int, error) {
+func (b *SQLBuilder) WriteString(s string) {
 	b.copyCheck()
 	b.buf = append(b.buf, s...)
-	return len(s), nil
+}
+
+func (b *SQLBuilder) WriteInt(i int) {
+	b.copyCheck()
+	b.buf = append(b.buf, strconv.FormatInt(int64(i), 10)...)
 }
 
 // RemoveEnd remove end of string

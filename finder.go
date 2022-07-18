@@ -173,17 +173,13 @@ func (finder *Finder) GetSQL() (string, error) {
 	//Question mark cut array
 	questions := strings.Split(sqlStr, "?")
 
-	//语句中没有?问号
 	//No in the sentence Question mark
 	if len(questions) < 1 {
 		return sqlStr, nil
 	}
 
-	//重新记录参数值
 	//Re-record the parameter value
 	newValues := make([]interface{}, 0)
-	//新的sql
-	//new sql
 	var newSQLStr SQLBuilder
 	//问号切割的语句实际长度比问号号个数多1个,先把第一个语句片段加上,后面就是比参数的索引大1
 	//The actual length of the sentence cut by the question mark is one more than the number of question marks. First, add the first sentence fragment, and the latter is one greater than the index of the parameter
