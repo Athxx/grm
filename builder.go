@@ -120,12 +120,6 @@ func (b *SQLBuilder) WriteString(s string) (int, error) {
 	return len(s), nil
 }
 
-// RemoveStart remove end of string
-func (b *SQLBuilder) RemoveStart(i int) {
-	b.copyCheck()
-	b.buf = b.buf[i:len(b.buf)] // it will panic when index not exist
-}
-
 // RemoveEnd remove end of string
 func (b *SQLBuilder) RemoveEnd(i int) {
 	b.copyCheck()

@@ -159,8 +159,6 @@ Transaction 的示例代码
 // bug(springrain)如果有大神修改了匿名函数内的参数名,例如改为ctx2,这样业务代码实际使用的是Transaction的context参数,如果为没有dbConn,会抛异常,如果有dbConn,实际就是一个对象.影响有限.也可以把匿名函数抽到外部
 // 如果全局DefaultTxOptions配置不满足需求,可以在grm.Transaction事务方法前设置事务的隔离级别,例如 ctx, _ := dbDao.BindCtxTxOptions(ctx, &sql.TxOptions{Isolation: sql.LevelDefault}),如果txOptions为nil,使用全局DefaultTxOptions
 // return的error如果不为nil,事务就会回滚
-// 如果使用了分布式事务,需要设置分布式事务函数grm.DBConfig.SeataGlobalTx,实现ISeataGlobalTx接口
-// 如果是分布式事务开启方,需要在本地事务前开启分布事务,开启之后获取XID,设值到ctx的XID和TX_XID.XID是seata MySQL驱动需要,TX_XID是seataContext.NewRootContext需要
 // 分布式事务需要传递XID,接收方context.WithValue(ctx, "XID", XID)绑定到ctx
 // 如果分支事务出现异常或者回滚,会立即回滚分布式事务
 // Transaction method, isolate db Connection related API. This method must be used for transaction processing and unified transaction mode
@@ -182,8 +180,6 @@ func Transaction(ctx context.Context, doTransaction func(ctx context.Context) (i
 	//是否是dbConn的开启方,如果是开启方,才可以提交事务
 	// Whether it is the opener of db Connection, if it is the opener, the transaction can be submitted
 	localTxOpen := false
-	//是否是seata全局事务的开启方.如果ctx中没有xid,认为是开启方
-	seataTxOpen := false
 	//如果dbConn不存在,则会用默认的datasource开启事务
 	// If db Connection does not exist, the default datasource will be used to start the transaction
 	var checkErr error
@@ -193,58 +189,10 @@ func Transaction(ctx context.Context, doTransaction func(ctx context.Context) (i
 		return nil, checkErr
 	}
 
-	//适配seata分布式事务的函数
-	funcSeataTx := dbConn.cfg.SeataGlobalTx
-	//实现ISeataGlobalTx接口的事务对象
-	var seataGlobalTx ISeataGlobalTx
-	//seata分布式事务的 rootContext,和业务的ctx区别开来,如果业务ctx使用WithValue,就会出现差异
-	var seataRootContext context.Context
-	//seata分布式事务的异常
-	var seataErr error
-
 	//如果没有事务,并且事务没有被禁用,开启事务
 	//开启本地事务前,需要拿到分布式事务对象
 	//if dbConn.tx == nil && (!dbConn.cfg.DisableTransaction) {
 	if dbConn.tx == nil {
-
-		//需要开启分布式事务,初始化分布式事务对象,判断是否是分布式事务入口
-		if funcSeataTx != nil {
-			//获取Seata XID
-			ctxXIDval := ctx.Value("XID")
-			if ctxXIDval != nil { //如果本地ctx中有XID
-				seataXID, _ := ctxXIDval.(string)
-				//不知道为什么需要两个Key,还需要请教seata-golang团队
-				//Seata mysql驱动需要 XID,seataContext.NewRootContext 需要 TX_XID
-				ctx = context.WithValue(ctx, "TX_XID", seataXID)
-			} else { //如果本地ctx中没有XID,也就是没有传递过来XID,认为是分布式事务的开启方.ctx中没有XID和TX_XID的值
-				seataTxOpen = true
-			}
-			//获取seata事务实现对象,用于控制事务提交和回滚.分支事务需要ctx中TX_XID有值,将分支事务关联到主事务
-			seataGlobalTx, seataRootContext, seataErr = funcSeataTx(ctx)
-			if seataErr != nil {
-				return nil, LogErr("seata:Transaction SeataGlobalTx获取ISeataGlobalTx接口实现失败:" + seataErr.Error())
-			}
-			if seataGlobalTx == nil || seataRootContext == nil {
-				return nil, LogErr("seata:Transaction SeataGlobalTx获取ISeataGlobalTx接口的实现为nil ")
-			}
-		}
-		if seataTxOpen { //如果是分布事务开启方,启动分布式事务
-			seataErr = seataGlobalTx.SeataBegin(seataRootContext)
-			if seataErr != nil {
-				return nil, LogErr("seata:Transaction 分布式事务开启失败:" + seataErr.Error())
-			}
-
-			//分布式事务开启成功,获取XID,设置到ctx的XID和TX_XID
-			//Seata mysql驱动需要 XID,seataContext.NewRootContext 需要 TX_XID
-			seataXID := seataGlobalTx.GetSeataXID(seataRootContext)
-			if len(seataXID) < 1 {
-				return nil, LogErr("seata:seataGlobalTx.SeataBegin无异常开启后,获取的XID为空")
-			}
-			ctx = context.WithValue(ctx, "XID", seataXID)
-			ctx = context.WithValue(ctx, "TX_XID", seataXID)
-		}
-
-		//开启本地事务/分支事务
 		beginErr := dbConn.beginTx(ctx)
 		if beginErr != nil {
 			return nil, LogErr("Transaction start error: " + beginErr.Error())
@@ -278,13 +226,6 @@ func Transaction(ctx context.Context, doTransaction func(ctx context.Context) (i
 			if err = dbConn.rollback(); err != nil {
 				LogErr("recover内事务回滚失败 " + err.Error())
 			}
-			//任意一个分支事务回滚,分布式事务就整体回滚
-			if seataGlobalTx != nil {
-				seataErr = seataGlobalTx.SeataRollback(seataRootContext)
-				if seataErr != nil {
-					LogErr("seata:recover内seataGlobalTx事务回滚失败 " + seataErr.Error())
-				}
-			}
 		}
 	}()
 
@@ -303,35 +244,13 @@ func Transaction(ctx context.Context, doTransaction func(ctx context.Context) (i
 		if rbErr != nil {
 			LogErr("Transaction-->rollback事务回滚失败 " + rbErr.Error())
 		}
-		//任意一个分支事务回滚,分布式事务就整体回滚
-		if seataGlobalTx != nil {
-			seataErr = seataGlobalTx.SeataRollback(seataRootContext)
-			if seataErr != nil {
-				LogErr("seata:Transaction-->rollback seataGlobalTx事务回滚失败 " + seataErr.Error())
-			}
-		}
 		return info, LogErr("Transaction-->doTransaction业务执行异常: " + err.Error())
 	}
 	//如果是事务开启方,提交事务
 	//If it is the transaction opener, commit the transaction
 	if localTxOpen {
 		commitError := dbConn.commit()
-		//本地事务提交成功,如果是全局事务的开启方,提交分布式事务
-		if commitError == nil && seataTxOpen {
-			seataErr = seataGlobalTx.SeataCommit(seataRootContext)
-			if seataErr != nil {
-				LogErr("seata:Transaction-->commit seataGlobalTx 事务提交失败 " + seataErr.Error())
-			}
-		}
 		if commitError != nil {
-			//任意一个分支事务回滚,分布式事务就整体回滚
-			if seataGlobalTx != nil {
-				seataErr = seataGlobalTx.SeataRollback(seataRootContext)
-				if seataErr != nil {
-					LogErr("seata:Transaction-->commit失败,然后回滚seataGlobalTx事务也失败 " + seataErr.Error())
-				}
-			}
-
 			return info, LogErr("Transaction-->commit事务提交失败 " + commitError.Error())
 		}
 	}

@@ -1,6 +1,6 @@
 ## Introduction
 ![grm logo](grm-logo.png)  
-This is a lightweight ORM,zero dependency, that supports DM,Kingbase,shentong,mysql,postgresql,oracle,mssql,sqlite,clickhouse databases.
+This is a lightweight ORM,zero dependency, mysql,postgresql,oracle,mssql,sqlite databases.
 
 Source address:https://github.com/athxx/grm  
 web site:[https://grm.cn](https://grm.cn)  
@@ -13,32 +13,15 @@ go get github.com/athxx/grm
 * [Built-in code generator](https://github.com/athxx/readygo/tree/master/codegenerator)  
 * The code is streamlined, main part 2500 lines, zero dependency 4000 lines, detailed comments, convenient for customization and modification. 
 * <font color=red>Support transaction propagation, which is the main reason for the birth of grm</font>
-* Support mysql, postgresql, oracle, mssql, sqlite, dm (Da Meng), kingbase (Ren Da Jincang),clickhouse
+* Support mysql, postgresql, oracle, mssql, sqlite
 * Support more databases, read and write separation.
 * The update performance of grm, gorm, and xorm is equivalent. The read performance of grm is twice as fast as that of gorm and xorm.
-* Does not support joint primary keys, alternatively thinks that there is no primary key, and business control is implemented (difficult choice)  
-* Integrate seata-golang, support global hosting, do not modify business code, and zero intrusive distributed transactions
+* Does not support joint primary keys, alternatively thinks that there is no primary key, and business control is implemented (difficult choice)
 * Support clickhouse, update and delete statements use SQL92 standard syntax. The official clickhouse-go driver does not support batch insert syntax, it is recommended to use https://github.com/mailru/go-clickhouse
 
 grm Production environment reference: [UserStructService.go](https://github.com/athxx/readygo/tree/master/permission/permservice)  
 
-## Support domestic database  
-DM(Da Meng) database driver: [https://github.com/athxx/dm](https://github.com/athxx/dm)  
-
-kingbase(Ren Da Jincang)Driver Instructions: [https://help.kingbase.com.cn/doc-view-8108.html](https://help.kingbase.com.cn/doc-view-8108.html)  
-The core of Kingbase(Ren Da Jincang) 8 is based on postgresql 9.6. You can use [https://github.com/lib/pq](https://github.com/lib/pq) for testing. The official driver is recommended for the production environment.    
-Pay attention to modify ora_input_emptystr_isnull = false in the data/kingbase.conf file , because golang has no null value. Generally, the database is not null, the default value of golang string is' '. 
-If this value is set to true, the database will set the value to null, which conflicts with the field property not null. Therefore, an error is reported.
-
-shentong(Shenzhou General Data)Instructions:
-It is recommended to use official driver, configure grm.DBConfig DriverName:aci ,DBType:shentong  
-
-gbase(GENERAL DATA)
-~~The official golang driver has not been found yet. Please configure it grm.DBConfig DriverName:gbase ,DBType:gbase~~  
-Use odbc driver for the time being,DriverName:odbc ,DBType:gbase
-
 ## Test case  
-https://github.com/athxx/readygo/blob/master/test/testgrm/BaseDao_test.go  
 
 ```go  
 // Grm uses native SQL statements and does not impose restrictions on SQL syntax. Statements use Finder as the carrier.
@@ -184,11 +167,7 @@ func init() {
 	dbDaoConfig := grm.DBConfig{
 		// DSN: Database connection string
 		DSN: "root:root@tcp(127.0.0.1:3306)/readygo?charset=utf8&parseTime=true",
-		// Database driver name: mysql, postgres, oci8, sqlserver, sqlite3,clickhouse, 
-        // dm, kingbase and DBType correspond, there are multiple drivers for processing databases
-		DriverName: "mysql",
 		// Database type (based on dialect judgment): mysql, postgresql,oracle, mssql, sqlite, clickhouse,
-        // dm, kingbase and DriverName correspond to multiple drivers for processing databases
 		DBType: "mysql",
 		//MaxOpenConns: Maximum number of database connections Default 50
 		MaxOpenConns: 50,

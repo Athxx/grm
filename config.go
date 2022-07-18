@@ -19,9 +19,7 @@ type dataSource struct {
 type DBConfig struct {
 	//DSN DataSourceName Database connection string
 	DSN string //
-	//Database diver name:mysql,postgres,oracle,sqlserver,sqlite3,clickhouse corresponds to DBType,A database may have multiple drivers
-	DriverName string
-	//Database Type:mysql,postgresql,oracle,mssql,sqlite,clickhouse corresponds to DriverName,A database may have multiple drivers
+	//Database Type:mysql,postgresql,oracle,mssql,sqlite,clickhouse corresponds to DBType,A database may have multiple drivers
 	DBType string
 	//ShowSQL Whether to print SQL, use grm.ShowSQL record sql
 	ShowSQL bool
@@ -38,17 +36,6 @@ type DBConfig struct {
 	//事务隔离级别的默认配置,默认为nil
 	DefaultTxOptions *sql.TxOptions
 
-	//全局禁用事务,默认false.为了处理某些数据库不支持事务,比如clickhouse
-	//禁用事务应该有驱动实现,不应该由orm实现
-	//DisableTransaction bool
-
-	//MockSQLDB 用于mock测试的入口,如果MockSQLDB不为nil,则不使用DSN,直接使用MockSQLDB
-	//db, mock, err := sqlmock.New()
-	//MockSQLDB *sql.DB
-
-	//SeataGlobalTx seata-golang分布式的适配函数,返回ISeataGlobalTx接口的实现
-	SeataGlobalTx func(ctx context.Context) (ISeataGlobalTx, context.Context, error)
-
 	//使用现有的数据库连接,优先级高于DSN
 	SQLDB *sql.DB
 }
@@ -61,9 +48,6 @@ func newDataSource(config *DBConfig) (*dataSource, error) {
 		return nil, errors.New("config cannot be nil")
 	}
 
-	if config.DriverName == "" {
-		return nil, errors.New("DriverName cannot be empty")
-	}
 	if config.DBType == "" {
 		return nil, errors.New("DBType cannot be empty")
 	}
@@ -74,7 +58,7 @@ func newDataSource(config *DBConfig) (*dataSource, error) {
 		if config.DSN == "" {
 			return nil, errors.New("DSN cannot be empty")
 		}
-		db, errSQLOpen = sql.Open(config.DriverName, config.DSN)
+		db, errSQLOpen = sql.Open(config.DBType, config.DSN)
 		if errSQLOpen != nil {
 			return nil, LogErr("newDataSource-->open数据库打开失败: " + errSQLOpen.Error())
 		}
@@ -92,14 +76,8 @@ func newDataSource(config *DBConfig) (*dataSource, error) {
 	if config.MaxLifetime == 0 {
 		config.MaxLifetime = 600
 	}
-
-	//设置数据库最大连接数
-	//Set the maximum number of database connections
 	db.SetMaxOpenConns(config.MaxOpenConns)
-	//设置数据库最大空闲连接数
-	//Set the maximum number of free connections to the database
 	db.SetMaxIdleConns(config.MaxIdleConns)
-	//连接存活秒时间. 默认600(10分钟)后连接被销毁重建.避免数据库主动断开连接,造成死连接.MySQL默认wait_timeout 28800秒(8小时)
 	//(Connection survival time in seconds) Destroy and rebuild the connection after the default 600 seconds (10 minutes)
 	//Prevent the database from actively disconnecting and causing dead connections. MySQL Default wait_timeout 28800 seconds
 	db.SetConnMaxLifetime(time.Second * time.Duration(config.MaxLifetime))
