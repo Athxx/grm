@@ -19,8 +19,8 @@ type dataSource struct {
 type DBConfig struct {
 	//DSN DataSourceName Database connection string
 	DSN string //
-	//Database Type:mysql,postgresql,oracle,mssql,sqlite,clickhouse corresponds to DBType,A database may have multiple drivers
-	DBType string
+	//Database Type:mysql,postgresql,oracle,mssql,sqlite,clickhouse corresponds to Driver,A database may have multiple drivers
+	Driver string
 	//ShowSQL Whether to print SQL, use grm.ShowSQL record sql
 	ShowSQL bool
 	//MaxOpenConns Maximum number of database connections, Default 50
@@ -48,8 +48,8 @@ func newDataSource(config *DBConfig) (*dataSource, error) {
 		return nil, errors.New("config cannot be nil")
 	}
 
-	if config.DBType == "" {
-		return nil, errors.New("DBType cannot be empty")
+	if config.Driver == "" {
+		return nil, errors.New("Driver cannot be empty")
 	}
 	var db *sql.DB
 	var errSQLOpen error
@@ -58,7 +58,7 @@ func newDataSource(config *DBConfig) (*dataSource, error) {
 		if config.DSN == "" {
 			return nil, errors.New("DSN cannot be empty")
 		}
-		db, errSQLOpen = sql.Open(config.DBType, config.DSN)
+		db, errSQLOpen = sql.Open(config.Driver, config.DSN)
 		if errSQLOpen != nil {
 			return nil, LogErr("newDataSource-->open数据库打开失败: " + errSQLOpen.Error())
 		}

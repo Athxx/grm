@@ -168,7 +168,7 @@ func init() {
 		// DSN: Database connection string
 		DSN: "root:root@tcp(127.0.0.1:3306)/readygo?charset=utf8&parseTime=true",
 		// Database type (based on dialect judgment): mysql, postgresql,oracle, mssql, sqlite, clickhouse,
-		DBType: "mysql",
+		Driver: "mysql",
 		//MaxOpenConns: Maximum number of database connections Default 50
 		MaxOpenConns: 50,
 		//MaxIdleConns: The maximum number of free connections to the database default 50

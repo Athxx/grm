@@ -284,18 +284,18 @@ func QueryRow(ctx context.Context, finder *Finder, entity interface{}) (bool, er
 		return false, errDBConn
 	}
 
-	var dbType string = ""
+	var drv string = ""
 	//dbConn为nil,使用defaultDao
 	//dbConn is nil, use default Dao
 	if dbConn == nil {
-		dbType = FuncReadWriteStrategy(0).config.DBType
+		drv = FuncReadWriteStrategy(0).config.Driver
 	} else {
-		dbType = dbConn.cfg.DBType
+		drv = dbConn.cfg.Driver
 	}
 
 	//获取到sql语句
 	//Get the sql statement
-	sqlStr, err := wrapQuerySQL(dbType, finder, nil)
+	sqlStr, err := wrapQuerySQL(drv, finder, nil)
 	if err != nil {
 		return false, LogErr("QueryRow-->wrapQuerySQL: " + err.Error())
 	}
@@ -489,14 +489,14 @@ func Query(ctx context.Context, finder *Finder, rowsSlicePtr interface{}, page *
 		return errDBConn
 	}
 
-	var dbType string = ""
+	var drv string = ""
 	if dbConn == nil { //dbConn为nil,使用defaultDao
-		dbType = FuncReadWriteStrategy(0).config.DBType
+		drv = FuncReadWriteStrategy(0).config.Driver
 	} else {
-		dbType = dbConn.cfg.DBType
+		drv = dbConn.cfg.Driver
 	}
 
-	sqlStr, err := wrapQuerySQL(dbType, finder, page)
+	sqlStr, err := wrapQuerySQL(drv, finder, page)
 	if err != nil {
 		return LogErr("Query-->wrapQuerySQL获取查询SQL语句错误: " + err.Error())
 	}
@@ -707,16 +707,16 @@ func QueryMap(ctx context.Context, finder *Finder, page *Page) ([]map[string]int
 		return nil, errDBConn
 	}
 
-	var dbType string = ""
+	var drv string = ""
 	//dbConn为nil,使用defaultDao
 	//db Connection is nil, use default Dao
 	if dbConn == nil {
-		dbType = FuncReadWriteStrategy(0).config.DBType
+		drv = FuncReadWriteStrategy(0).config.Driver
 	} else {
-		dbType = dbConn.cfg.DBType
+		drv = dbConn.cfg.Driver
 	}
 
-	sqlStr, err := wrapQuerySQL(dbType, finder, page)
+	sqlStr, err := wrapQuerySQL(drv, finder, page)
 	if err != nil {
 		return nil, LogErr("QueryMap -->wrapQuerySQL查询SQL语句错误: " + err.Error())
 	}
@@ -891,16 +891,16 @@ func UpdateFinder(ctx context.Context, finder *Finder) (int, error) {
 		return affected, errDBConn
 	}
 
-	var dbType string = ""
+	var drv string = ""
 	//dbConn为nil,使用defaultDao
 	//dbConn is nil, use default Dao
 	if dbConn == nil {
-		dbType = FuncReadWriteStrategy(1).config.DBType
+		drv = FuncReadWriteStrategy(1).config.Driver
 	} else {
-		dbType = dbConn.cfg.DBType
+		drv = dbConn.cfg.Driver
 	}
 
-	sqlStr, err = reBindSQL(dbType, sqlStr)
+	sqlStr, err = reBindSQL(drv, sqlStr)
 	if err != nil {
 		return affected, LogErr("UpdateFinder-->reBindSQL获取SQL语句错误: " + err.Error())
 	}
@@ -943,16 +943,16 @@ func Insert(ctx context.Context, entity IEntityStruct) (int, error) {
 		return affected, errDBConn
 	}
 
-	var dbType string = ""
+	var drv string = ""
 	//dbConn为nil,使用defaultDao
 	//dbConn is nil, use default Dao
 	if dbConn == nil {
-		dbType = FuncReadWriteStrategy(1).config.DBType
+		drv = FuncReadWriteStrategy(1).config.Driver
 	} else {
-		dbType = dbConn.cfg.DBType
+		drv = dbConn.cfg.Driver
 	}
 
-	sqlStr, autoIncrement, pkType, err := wrapInsertSQL(dbType, &typeOf, entity, &columns, &values)
+	sqlStr, autoIncrement, pkType, err := wrapInsertSQL(drv, &typeOf, entity, &columns, &values)
 	if err != nil {
 		return affected, LogErr("Insert-->wrapInsertSQL获取保存语句错误: " + err.Error())
 	}
@@ -963,11 +963,11 @@ func Insert(ctx context.Context, entity IEntityStruct) (int, error) {
 	var grmSQLOutReturningID *int64
 	//如果是postgresql的SERIAL自增,需要使用 RETURNING 返回主键的值
 	if autoIncrement > 0 {
-		if dbType == "postgresql" {
+		if drv == "postgresql" {
 			var p int64 = 0
 			lastInsertID = &p
 			sqlStr = sqlStr + " RETURNING " + entity.PK()
-		} else if dbType == "oracle" {
+		} else if drv == "oracle" {
 			var p int64 = 0
 			grmSQLOutReturningID = &p
 			sqlStr = sqlStr + " RETURNING " + entity.PK() + " INTO :grmSQLOutReturningID "
@@ -1056,15 +1056,15 @@ func InsertSlice(ctx context.Context, entityStructSlice []IEntityStruct) (int, e
 		return affected, errDBConn
 	}
 
-	var dbType string = ""
+	var drv string = ""
 	if dbConn == nil { //dbConn为nil,使用defaultDao
-		dbType = FuncReadWriteStrategy(1).config.DBType
+		drv = FuncReadWriteStrategy(1).config.Driver
 	} else {
-		dbType = dbConn.cfg.DBType
+		drv = dbConn.cfg.Driver
 	}
 
 	//SQL语句
-	sqlStr, _, err := wrapInsertSliceSQL(dbType, &typeOf, entityStructSlice, &columns, &values)
+	sqlStr, _, err := wrapInsertSliceSQL(drv, &typeOf, entityStructSlice, &columns, &values)
 	if err != nil {
 		return affected, LogErr("InsertSlice-->wrapInsertSliceSQL获取保存语句错误: " + err.Error())
 	}
@@ -1126,15 +1126,15 @@ func Delete(ctx context.Context, entity IEntityStruct) (int, error) {
 		return affected, errDBConn
 	}
 
-	var dbType string = ""
+	var drv string = ""
 	if dbConn == nil { //dbConn为nil,使用defaultDao
-		dbType = FuncReadWriteStrategy(1).config.DBType
+		drv = FuncReadWriteStrategy(1).config.Driver
 	} else {
-		dbType = dbConn.cfg.DBType
+		drv = dbConn.cfg.Driver
 	}
 
 	//SQL语句
-	sqlStr, err := wrapDeleteSQL(dbType, entity)
+	sqlStr, err := wrapDeleteSQL(drv, entity)
 	if err != nil {
 		return affected, LogErr("Delete-->wrapDeleteSQL获取SQL语句错误: " + err.Error())
 	}
@@ -1171,15 +1171,15 @@ func InsertEntityMap(ctx context.Context, entity IEntityMap) (int, error) {
 		return affected, errDBConn
 	}
 
-	var dbType string = ""
+	var drv string = ""
 	if dbConn == nil { //dbConn为nil,使用defaultDao
-		dbType = FuncReadWriteStrategy(1).config.DBType
+		drv = FuncReadWriteStrategy(1).config.Driver
 	} else {
-		dbType = dbConn.cfg.DBType
+		drv = dbConn.cfg.Driver
 	}
 
 	//SQL语句
-	sqlStr, values, autoIncrement, err := wrapInsertEntityMapSQL(dbType, entity)
+	sqlStr, values, autoIncrement, err := wrapInsertEntityMapSQL(drv, entity)
 	if err != nil {
 		return affected, LogErr("InsertEntityMap-->wrapInsertEntityMapSQL获取SQL语句错误: " + err.Error())
 	}
@@ -1189,11 +1189,11 @@ func InsertEntityMap(ctx context.Context, entity IEntityMap) (int, error) {
 	var grmSQLOutReturningID *int64
 	//如果是postgresql的SERIAL自增,需要使用 RETURNING 返回主键的值
 	if autoIncrement && entity.PK() != "" {
-		if dbType == "postgresql" {
+		if drv == "postgresql" {
 			var p int64 = 0
 			lastInsertID = &p
 			sqlStr = sqlStr + " RETURNING " + entity.PK()
-		} else if dbType == "oracle" {
+		} else if drv == "oracle" {
 			var p int64 = 0
 			grmSQLOutReturningID = &p
 			sqlStr = sqlStr + " RETURNING " + entity.PK() + " INTO :grmSQLOutReturningID "
@@ -1264,18 +1264,18 @@ func UpdateEntityMap(ctx context.Context, entity IEntityMap) (int, error) {
 		return affected, errDBConn
 	}
 
-	var dbType string = ""
+	var drv string = ""
 	//dbConn为nil,使用defaultDao
 	//dbConn is nil, use default Dao
 	if dbConn == nil {
-		dbType = FuncReadWriteStrategy(1).config.DBType
+		drv = FuncReadWriteStrategy(1).config.Driver
 	} else {
-		dbType = dbConn.cfg.DBType
+		drv = dbConn.cfg.Driver
 	}
 
 	//SQL语句
 	//SQL statement
-	sqlStr, values, err := wrapUpdateEntityMapSQL(dbType, entity)
+	sqlStr, values, err := wrapUpdateEntityMapSQL(drv, entity)
 	if err != nil {
 		return affected, LogErr("UpdateEntityMap-->wrapUpdateEntityMapSQL获取SQL语句错误: " + err.Error())
 	}
@@ -1311,12 +1311,12 @@ func updateStructFunc(ctx context.Context, entity IEntityStruct, onlyUpdateNotZe
 		return affected, errDBConn
 	}
 
-	var dbType string = ""
+	var drv string
 	//dbConn is nil, use default Dao
 	if dbConn == nil {
-		dbType = FuncReadWriteStrategy(1).config.DBType
+		drv = FuncReadWriteStrategy(1).config.Driver
 	} else {
-		dbType = dbConn.cfg.DBType
+		drv = dbConn.cfg.Driver
 	}
 
 	typeOf, columns, values, columnAndValueErr := columnAndValue(entity)
@@ -1326,7 +1326,7 @@ func updateStructFunc(ctx context.Context, entity IEntityStruct, onlyUpdateNotZe
 
 	//SQL语句
 	//SQL statement
-	sqlStr, err := wrapUpdateSQL(dbType, &typeOf, entity, &columns, &values, onlyUpdateNotZero)
+	sqlStr, err := wrapUpdateSQL(drv, &typeOf, entity, &columns, &values, onlyUpdateNotZero)
 	if err != nil {
 		return affected, err
 	}
@@ -1482,7 +1482,7 @@ func wrapExecUpdateValuesAffected(ctx context.Context, affected *int, sqlStrptr 
 	}
 
 	// 数据库语法兼容处理
-	sqlStr, err := reUpdateFinderSQL(dbConn.cfg.DBType, sqlStrptr)
+	sqlStr, err := reUpdateFinderSQL(dbConn.cfg.Driver, sqlStrptr)
 	if err != nil {
 		return nil, LogErr("wrapExecUpdateValuesAffected-->reUpdateFinderSQL获取SQL语句错误 " + err.Error())
 	}

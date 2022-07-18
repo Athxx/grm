@@ -15,7 +15,7 @@ import (
 
 //wrapPageSQL 包装分页的SQL语句
 //wrapPageSQL SQL statement for wrapping paging
-func wrapPageSQL(dbType string, sqlStr string, page *Page) (string, error) {
+func wrapPageSQL(drv string, sqlStr string, page *Page) (string, error) {
 	//新的分页方法都已经不需要order by了,不再强制检查
 	//The new paging method does not require 'order by' anymore, no longer mandatory check.
 	//
@@ -27,38 +27,38 @@ func wrapPageSQL(dbType string, sqlStr string, page *Page) (string, error) {
 	*/
 	var sqlbuilder SQLBuilder
 	sqlbuilder.WriteString(sqlStr)
-	if dbType == "mysql" || dbType == "sqlite" || dbType == "clickhouse" { //MySQL,sqlite3,dm数据库,南大通用,clickhouse
+	if drv == "mysql" || drv == "sqlite" || drv == "clickhouse" { //MySQL,sqlite3,dm数据库,南大通用,clickhouse
 		sqlbuilder.WriteString(" LIMIT ")
 		sqlbuilder.WriteString(strconv.Itoa(page.PageSize * (page.PageNo - 1)))
 		sqlbuilder.WriteString(",")
 		sqlbuilder.WriteString(strconv.Itoa(page.PageSize))
-	} else if dbType == "postgresql" { //postgresql
+	} else if drv == "postgresql" { //postgresql
 		sqlbuilder.WriteString(" LIMIT ")
 		sqlbuilder.WriteString(strconv.Itoa(page.PageSize))
 		sqlbuilder.WriteString(" OFFSET ")
 		sqlbuilder.WriteString(strconv.Itoa(page.PageSize * (page.PageNo - 1)))
-	} else if dbType == "mssql" || dbType == "oracle" { //sqlserver 2012+,oracle 12c+
+	} else if drv == "mssql" || drv == "oracle" { //sqlserver 2012+,oracle 12c+
 		sqlbuilder.WriteString(" OFFSET ")
 		sqlbuilder.WriteString(strconv.Itoa(page.PageSize * (page.PageNo - 1)))
 		sqlbuilder.WriteString(" ROWS FETCH NEXT ")
 		sqlbuilder.WriteString(strconv.Itoa(page.PageSize))
 		sqlbuilder.WriteString(" ROWS ONLY ")
 	} else {
-		return "", errors.New("wrapPageSQL()-->不支持的数据库类型:" + dbType)
+		return "", errors.New("wrapPageSQL()-->不支持的数据库类型:" + drv)
 	}
-	return reBindSQL(dbType, sqlbuilder.String())
+	return reBindSQL(drv, sqlbuilder.String())
 }
 
 //wrapInsertSQL  包装保存Struct语句.返回语句,是否自增,错误信息
 //数组传递,如果外部方法有调用append的逻辑，append会破坏指针引用，所以传递指针
 //wrapInsertSQL Pack and save 'Struct' statement. Return  SQL statement, whether it is incremented, error message
 //Array transfer, if the external method has logic to call append, append will destroy the pointer reference, so the pointer is passed
-func wrapInsertSQL(dbType string, typeOf *reflect.Type, entity IEntityStruct, columns *[]reflect.StructField, values *[]interface{}) (string, int, string, error) {
-	sqlStr, autoIncrement, pkType, err := wrapInsertSQLNOreBuild(dbType, typeOf, entity, columns, values)
+func wrapInsertSQL(drv string, typeOf *reflect.Type, entity IEntityStruct, columns *[]reflect.StructField, values *[]interface{}) (string, int, string, error) {
+	sqlStr, autoIncrement, pkType, err := wrapInsertSQLNOreBuild(drv, typeOf, entity, columns, values)
 	if err != nil {
 		return sqlStr, autoIncrement, pkType, err
 	}
-	saveSql, err := reBindSQL(dbType, sqlStr)
+	saveSql, err := reBindSQL(drv, sqlStr)
 	return saveSql, autoIncrement, pkType, err
 }
 
@@ -66,7 +66,7 @@ func wrapInsertSQL(dbType string, typeOf *reflect.Type, entity IEntityStruct, co
 //数组传递,如果外部方法有调用append的逻辑,传递指针,因为append会破坏指针引用
 //Pack and save Struct statement. Return  SQL statement, no rebuild, return original SQL, whether it is self-increment, error message
 //Array transfer, if the external method has logic to call append, append will destroy the pointer reference, so the pointer is passed
-func wrapInsertSQLNOreBuild(dbType string, typeOf *reflect.Type, entity IEntityStruct, columns *[]reflect.StructField, values *[]interface{}) (string, int, string, error) {
+func wrapInsertSQLNOreBuild(drv string, typeOf *reflect.Type, entity IEntityStruct, columns *[]reflect.StructField, values *[]interface{}) (string, int, string, error) {
 
 	//自增类型  0(不自增),1(普通自增),2(序列自增),3(触发器自增)
 	//Self-increment type： 0（Not increase）,1(Ordinary increment),2(Sequence increment),3(Trigger increment)
@@ -95,7 +95,7 @@ func wrapInsertSQLNOreBuild(dbType string, typeOf *reflect.Type, entity IEntityS
 	var sequence string
 	var sequenceOK bool
 	if entity.GetPkSequence() != nil {
-		sequence, sequenceOK = entity.GetPkSequence()[dbType]
+		sequence, sequenceOK = entity.GetPkSequence()[drv]
 		if sequenceOK { //存在序列 Existence sequence
 			if sequence == "" { //触发器自增,也兼容自增关键字 Auto-increment by trigger, also compatible with auto-increment keywords.
 				autoIncrement = 3
@@ -194,7 +194,7 @@ func wrapInsertSQLNOreBuild(dbType string, typeOf *reflect.Type, entity IEntityS
 	sqlBuilder.WriteString(")")
 	sqlBuilder.WriteString(valueSQLBuilder.String())
 	sqlBuilder.WriteString(")")
-	//saveSql, err := wrapSQL(dbType, sqlStr)
+	//saveSql, err := wrapSQL(drv, sqlStr)
 	return sqlBuilder.String(), autoIncrement, pkType, nil
 }
 
@@ -202,7 +202,7 @@ func wrapInsertSQLNOreBuild(dbType string, typeOf *reflect.Type, entity IEntityS
 //数组传递,如果外部方法有调用append的逻辑，append会破坏指针引用，所以传递指针
 //wrapInsertSliceSQL Package and save Struct Slice statements in batches. Return SQL statement, whether it is incremented, error message
 //Array transfer, if the external method has logic to call append, append will destroy the pointer reference, so the pointer is passed
-func wrapInsertSliceSQL(dbType string, typeOf *reflect.Type, entityStructSlice []IEntityStruct, columns *[]reflect.StructField, values *[]interface{}) (string, int, error) {
+func wrapInsertSliceSQL(drv string, typeOf *reflect.Type, entityStructSlice []IEntityStruct, columns *[]reflect.StructField, values *[]interface{}) (string, int, error) {
 	sliceLen := len(entityStructSlice)
 	if entityStructSlice == nil || sliceLen < 1 {
 		return "", 0, errors.New("wrapInsertSliceSQL对象数组不能为空")
@@ -214,14 +214,14 @@ func wrapInsertSliceSQL(dbType string, typeOf *reflect.Type, entityStructSlice [
 
 	//先生成一条语句
 	//Generate a statement first
-	sqlStr, autoIncrement, _, firstErr := wrapInsertSQLNOreBuild(dbType, typeOf, entity, columns, values)
+	sqlStr, autoIncrement, _, firstErr := wrapInsertSQLNOreBuild(drv, typeOf, entity, columns, values)
 	if firstErr != nil {
 		return "", autoIncrement, firstErr
 	}
 	//如果只有一个Struct对象
 	//If there is only one Struct object
 	if sliceLen == 1 {
-		sqlStr, _ = reBindSQL(dbType, sqlStr)
+		sqlStr, _ = reBindSQL(drv, sqlStr)
 		return sqlStr, autoIncrement, firstErr
 	}
 	//主键的名称
@@ -285,7 +285,7 @@ func wrapInsertSliceSQL(dbType string, typeOf *reflect.Type, entityStructSlice [
 
 	//包装sql
 	//Wrap sql
-	saveSql, err := reBindSQL(dbType, insertSliceSQLBuilder.String())
+	saveSql, err := reBindSQL(drv, insertSliceSQLBuilder.String())
 	return saveSql, autoIncrement, err
 }
 
@@ -293,7 +293,7 @@ func wrapInsertSliceSQL(dbType string, typeOf *reflect.Type, entityStructSlice [
 //数组传递,如果外部方法有调用append的逻辑，append会破坏指针引用，所以传递指针
 //wrapUpdateSQL Package update Struct statement
 //Array transfer, if the external method has logic to call append, append will destroy the pointer reference, so the pointer is passed
-func wrapUpdateSQL(dbType string, typeOf *reflect.Type, entity IEntityStruct, columns *[]reflect.StructField, values *[]interface{}, onlyUpdateNotZero bool) (string, error) {
+func wrapUpdateSQL(drv string, typeOf *reflect.Type, entity IEntityStruct, columns *[]reflect.StructField, values *[]interface{}, onlyUpdateNotZero bool) (string, error) {
 
 	//SQL语句的构造器
 	//SQL statement constructor
@@ -353,12 +353,12 @@ func wrapUpdateSQL(dbType string, typeOf *reflect.Type, entity IEntityStruct, co
 	sqlBuilder.WriteString(entity.PK())
 	sqlBuilder.WriteString("=?")
 
-	return reBindSQL(dbType, sqlBuilder.String())
+	return reBindSQL(drv, sqlBuilder.String())
 }
 
 //wrapDeleteSQL 包装删除Struct语句
 //wrapDeleteSQL Package delete Struct statement
-func wrapDeleteSQL(dbType string, entity IEntityStruct) (string, error) {
+func wrapDeleteSQL(drv string, entity IEntityStruct) (string, error) {
 
 	//SQL语句的构造器
 	//SQL statement constructor
@@ -368,13 +368,13 @@ func wrapDeleteSQL(dbType string, entity IEntityStruct) (string, error) {
 	sqlBuilder.WriteString(" WHERE ")
 	sqlBuilder.WriteString(entity.PK())
 	sqlBuilder.WriteString("=?")
-	return reBindSQL(dbType, sqlBuilder.String())
+	return reBindSQL(drv, sqlBuilder.String())
 }
 
 //wrapInsertEntityMapSQL 包装保存Map语句,Map因为没有字段属性,无法完成Id的类型判断和赋值,需要确保Map的值是完整的
 //wrapInsertEntityMapSQL Pack and save the Map statement. Because Map does not have field attributes,
 //it cannot complete the type judgment and assignment of ID. It is necessary to ensure that the value of Map is complete
-func wrapInsertEntityMapSQL(dbType string, entity IEntityMap) (string, []interface{}, bool, error) {
+func wrapInsertEntityMapSQL(drv string, entity IEntityMap) (string, []interface{}, bool, error) {
 	//是否自增,默认false
 	dbFieldMap := entity.FieldMap()
 	if len(dbFieldMap) < 1 {
@@ -401,7 +401,7 @@ func wrapInsertEntityMapSQL(dbType string, entity IEntityMap) (string, []interfa
 	_, hasPK := dbFieldMap[entity.PK()]
 	if !hasPK { //如果没有设置主键,认为是自增或者序列 | If the primary key is not set, it is considered to be auto-increment or sequence
 		autoIncrement = true
-		if sequence, ok := entity.GetPkSequence()[dbType]; ok { //如果是序列 | If it is a sequence.
+		if sequence, ok := entity.GetPkSequence()[drv]; ok { //如果是序列 | If it is a sequence.
 			sqlBuilder.WriteString(entity.PK())
 			sqlBuilder.WriteString(",")
 			valueSQLBuilder.WriteString(sequence)
@@ -427,7 +427,7 @@ func wrapInsertEntityMapSQL(dbType string, entity IEntityMap) (string, []interfa
 	sqlBuilder.WriteString(")")
 	sqlBuilder.WriteString(valueSQLBuilder.String())
 	sqlBuilder.WriteString(")")
-	sqlStr, e := reBindSQL(dbType, sqlBuilder.String())
+	sqlStr, e := reBindSQL(drv, sqlBuilder.String())
 	if e != nil {
 		return "", nil, autoIncrement, e
 	}
@@ -437,7 +437,7 @@ func wrapInsertEntityMapSQL(dbType string, entity IEntityMap) (string, []interfa
 //wrapUpdateEntityMapSQL 包装Map更新语句,Map因为没有字段属性,无法完成Id的类型判断和赋值,需要确保Map的值是完整的
 //wrapUpdateEntityMapSQL Wrap the Map update statement. Because Map does not have field attributes,
 //it cannot complete the type judgment and assignment of Id. It is necessary to ensure that the value of Map is complete
-func wrapUpdateEntityMapSQL(dbType string, entity IEntityMap) (string, []interface{}, error) {
+func wrapUpdateEntityMapSQL(drv string, entity IEntityMap) (string, []interface{}, error) {
 	dbFieldMap := entity.FieldMap()
 	if len(dbFieldMap) < 1 {
 		return "", nil, errors.New("wrapUpdateEntityMapSQL-->FieldMap返回值不能为空")
@@ -477,7 +477,7 @@ func wrapUpdateEntityMapSQL(dbType string, entity IEntityMap) (string, []interfa
 	sqlBuilder.WriteString("=?")
 
 	var e error
-	sqlStr, e = reBindSQL(dbType, sqlBuilder.String())
+	sqlStr, e = reBindSQL(drv, sqlBuilder.String())
 	if e != nil {
 		return "", nil, e
 	}
@@ -486,7 +486,7 @@ func wrapUpdateEntityMapSQL(dbType string, entity IEntityMap) (string, []interfa
 
 //wrapQuerySQL 封装查询语句
 //wrapQuerySQL Encapsulated query statement
-func wrapQuerySQL(dbType string, finder *Finder, page *Page) (string, error) {
+func wrapQuerySQL(drv string, finder *Finder, page *Page) (string, error) {
 
 	//获取到没有page的sql的语句
 	//Get the SQL statement without page.
@@ -495,9 +495,9 @@ func wrapQuerySQL(dbType string, finder *Finder, page *Page) (string, error) {
 		return "", err
 	}
 	if page == nil {
-		sqlStr, err = reBindSQL(dbType, sqlStr)
+		sqlStr, err = reBindSQL(drv, sqlStr)
 	} else {
-		sqlStr, err = wrapPageSQL(dbType, sqlStr, page)
+		sqlStr, err = wrapPageSQL(drv, sqlStr, page)
 	}
 
 	if err != nil {
@@ -508,8 +508,8 @@ func wrapQuerySQL(dbType string, finder *Finder, page *Page) (string, error) {
 
 //reBindSQL 包装基础的SQL语句,根据数据库类型,调整SQL变量符号,例如?,? $1,$2这样的
 //reBindSQL Pack basic SQL statements, adjust the SQL variable symbols according to the database type, such as?,? $1,$2
-func reBindSQL(dbType string, sqlStr string) (string, error) {
-	if dbType == "mysql" || dbType == "sqlite" || dbType == "clickhouse" {
+func reBindSQL(drv string, sqlStr string) (string, error) {
+	if drv == "mysql" || drv == "sqlite" || drv == "clickhouse" {
 		return sqlStr, nil
 	}
 
@@ -520,13 +520,13 @@ func reBindSQL(dbType string, sqlStr string) (string, error) {
 	var sqlBuilder SQLBuilder
 	sqlBuilder.WriteString(strs[0])
 	for i := 1; i < len(strs); i++ {
-		if dbType == "postgresql" { //postgresql
+		if drv == "postgresql" { //postgresql
 			sqlBuilder.WriteString("$")
 			sqlBuilder.WriteString(strconv.Itoa(i))
-		} else if dbType == "mssql" { //mssql
+		} else if drv == "mssql" { //mssql
 			sqlBuilder.WriteString("@p")
 			sqlBuilder.WriteString(strconv.Itoa(i))
-		} else if dbType == "oracle" { //oracle
+		} else if drv == "oracle" { //oracle
 			sqlBuilder.WriteString(":")
 			sqlBuilder.WriteString(strconv.Itoa(i))
 		} else { //其他情况,还是使用 '?' | In other cases, or use'?'
@@ -538,10 +538,10 @@ func reBindSQL(dbType string, sqlStr string) (string, error) {
 }
 
 //reUpdateFinderSQL 根据数据类型更新 手动编写的 UpdateFinder的语句,用于处理数据库兼容,例如 clickhouse的 UPDATE 和 DELETE
-func reUpdateFinderSQL(dbType string, sqlStr *string) (*string, error) {
+func reUpdateFinderSQL(drv string, sqlStr *string) (*string, error) {
 
 	//处理clickhouse的特殊更新语法
-	if dbType == "clickhouse" {
+	if drv == "clickhouse" {
 		//SQL语句的构造器
 		//SQL statement constructor
 		var sqlBuilder SQLBuilder
